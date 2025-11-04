@@ -29,10 +29,12 @@ impl StopWatch {
 
     pub fn stop(&self) {
         if let Some(duration) = self.instant {
+            let elapsed = duration.elapsed();
+
             println!(
                 "Duration: {}.{}s",
-                duration.elapsed().as_secs(),
-                duration.elapsed().subsec_nanos()
+                elapsed.as_secs(),
+                elapsed.subsec_nanos()
             )
         } else {
             println!("Stop was called before start")
