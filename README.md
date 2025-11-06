@@ -5,7 +5,7 @@ Rust this time, fell in love with the language 🦀
 ### To scaffold a new day use
 
 ```bash
-./create.sh XX
+./create XX
 ```
 
 ### To run a day use
