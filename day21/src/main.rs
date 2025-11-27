@@ -38,7 +38,7 @@ static DIRECTIONAL_KEYPAD: Lazy<HashMap<char, Coordinate>> = Lazy::new(|| {
 fn main() -> Result<(), Box<dyn Error>> {
     let mut stopwatch = StopWatch::new();
 
-    let codes = read_file('l', |x| {
+    let codes = read_file(|x| {
         x.split('\n')
             .map(|s| s.chars().collect::<Vec<_>>())
             .collect::<Vec<_>>()
