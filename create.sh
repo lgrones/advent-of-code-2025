@@ -23,7 +23,13 @@ fn main() -> Result<(), Box<dyn Error>> {
 
     stopwatch.start();
 
-    println!(\"{input}\");
+    println!(\"PART 1: {input}\");
+
+    stopwatch.stop();
+
+	stopwatch.start();
+
+    println!(\"PART 2: {input}\");
 
     stopwatch.stop();
 

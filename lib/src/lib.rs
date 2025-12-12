@@ -1,9 +1,9 @@
 use std::{env, error::Error, fs, panic::Location, path::PathBuf, time::Instant};
 
 #[track_caller]
-pub fn read_file<T, F>(select: F) -> Result<T, Box<dyn Error>>
+pub fn read_file<T, F>(mut select: F) -> Result<T, Box<dyn Error>>
 where
-    F: Fn(String) -> T,
+    F: FnMut(String) -> T,
 {
     let initial = env::args().nth(1).unwrap().chars().nth(0).unwrap();
 
