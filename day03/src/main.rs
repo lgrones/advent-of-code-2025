@@ -8,47 +8,60 @@ fn main() -> Result<(), Box<dyn Error>> {
 
     stopwatch.start();
 
-    let mut result = 0;
-
-    for mut bank in banks {
-        let joltage;
-        let (max, max_index) = search_max(&bank, 0);
-
-        if max_index == bank.len() - 1 {
-            bank.reverse();
-            let (max2, _) = search_max(&bank, 1);
-            joltage = max2 * 10 + max;
-        } else {
-            let (max2, _) = search_max(&bank, max_index + 1);
-            joltage = max * 10 + max2;
-        }
-
-        result += joltage;
-    }
+    let mut result = banks
+        .iter()
+        .fold(0, |acc, curr| acc + curr.search_max_with_n_places(2));
 
     println!("PART 1: {result}");
+
+    stopwatch.stop();
+
+    stopwatch.start();
+
+    result = banks
+        .iter()
+        .fold(0, |acc, curr| acc + curr.search_max_with_n_places(12));
+
+    println!("PART 2: {result}");
 
     stopwatch.stop();
 
     Ok(())
 }
 
-fn search_max(bank: &Vec<char>, start: usize) -> (u32, usize) {
-    let mut max = 0;
-    let mut max_index = 0;
-
-    for i in start..bank.len() {
-        let curr = bank[i].to_digit(10).unwrap();
-
-        if max < curr {
-            max = curr;
-            max_index = i;
-        }
-    }
-
-    (max, max_index)
+struct Bank {
+    batteries: Vec<u64>,
 }
 
-fn get_banks() -> Result<Vec<Vec<char>>, Box<dyn Error>> {
-    read_file(|x| x.lines().map(|y| y.chars().collect()).collect())
+impl Bank {
+    fn search_max_with_n_places(&self, n: usize) -> u64 {
+        let mut index = 0;
+        let mut result = 0;
+
+        for exponent in (0..n).rev() {
+            let bank = &self.batteries[index..self.batteries.len() - exponent];
+            let max = bank.iter().max().unwrap();
+
+            index = 1 + self
+                .batteries
+                .iter()
+                .enumerate()
+                .position(|(i, x)| i >= index && x == max)
+                .unwrap();
+
+            result += 10u64.pow(exponent as u32) * max;
+        }
+
+        result
+    }
+}
+
+fn get_banks() -> Result<Vec<Bank>, Box<dyn Error>> {
+    read_file(|x| {
+        x.lines()
+            .map(|y| Bank {
+                batteries: y.chars().map(|z| z.to_digit(10).unwrap() as u64).collect(),
+            })
+            .collect()
+    })
 }
