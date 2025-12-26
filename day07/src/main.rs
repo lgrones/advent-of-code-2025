@@ -1,34 +1,18 @@
 use lib::{StopWatch, read_file};
-use std::{collections::HashSet, error::Error};
+use std::{
+    collections::{HashMap, HashSet},
+    error::Error,
+};
 
 fn main() -> Result<(), Box<dyn Error>> {
     let mut stopwatch = StopWatch::new();
 
     let map = get_map()?;
+    let start = map[0].iter().position(|x| x == &'S').unwrap();
 
     stopwatch.start();
 
-    let mut result = 0;
-    let x = map[0].iter().enumerate().find(|x| x.1 == &'S').unwrap().0;
-
-    let mut tachyons = HashSet::from([Tachyon { x, y: 0 }]);
-
-    while !tachyons.is_empty() {
-        let mut next = vec![];
-
-        while let Some(tachyon) = tachyons.iter().next().cloned() {
-            tachyons.remove(&tachyon);
-            let beamed = tachyon.beam(&map);
-
-            if beamed.len() == 2 {
-                result += 1;
-            }
-
-            next.extend(beamed);
-        }
-
-        tachyons.extend(next);
-    }
+    let mut result = move_down(&map, start);
 
     println!("PART 1: {result}");
 
@@ -36,7 +20,7 @@ fn main() -> Result<(), Box<dyn Error>> {
 
     stopwatch.start();
 
-    result = traverse(Tachyon { x, y: 0 }, &map);
+    result = traverse(&Tachyon { x: start, y: 0 }, &map, &mut HashMap::new());
 
     println!("PART 2: {result}");
 
@@ -52,25 +36,26 @@ struct Tachyon {
 }
 
 impl Tachyon {
-    fn beam(mut self, map: &Vec<Vec<char>>) -> Vec<Tachyon> {
-        self.y += 1;
+    fn beam(&self, map: &Vec<Vec<char>>) -> Vec<Tachyon> {
+        let mut next = self.clone();
+        next.y += 1;
 
-        if self.y == map.len() {
+        if next.y == map.len() {
             return vec![];
         }
 
-        if map[self.y][self.x] == '.' {
-            return vec![self];
+        if map[next.y][next.x] == '.' {
+            return vec![next];
         }
 
         vec![
             Tachyon {
-                x: self.x - 1,
-                y: self.y,
+                x: next.x - 1,
+                y: next.y,
             },
             Tachyon {
-                x: self.x + 1,
-                y: self.y,
+                x: next.x + 1,
+                y: next.y,
             },
         ]
     }
@@ -80,7 +65,35 @@ fn get_map() -> Result<Vec<Vec<char>>, Box<dyn Error>> {
     read_file(|x| x.lines().map(|y| y.chars().collect()).collect())
 }
 
-fn traverse(tachyon: Tachyon, map: &Vec<Vec<char>>) -> i32 {
+fn move_down(map: &Vec<Vec<char>>, start: usize) -> u64 {
+    let mut result = 0;
+    let mut tachyons = HashSet::from([Tachyon { x: start, y: 0 }]);
+
+    while !tachyons.is_empty() {
+        let mut next = vec![];
+
+        while let Some(tachyon) = tachyons.iter().next().cloned() {
+            tachyons.remove(&tachyon);
+            let beamed = tachyon.beam(map);
+
+            if beamed.len() == 2 {
+                result += 1;
+            }
+
+            next.extend(beamed);
+        }
+
+        tachyons.extend(next);
+    }
+
+    result
+}
+
+fn traverse(tachyon: &Tachyon, map: &Vec<Vec<char>>, cache: &mut HashMap<Tachyon, u64>) -> u64 {
+    if cache.contains_key(tachyon) {
+        return *cache.get(tachyon).unwrap();
+    }
+
     let tachyons = tachyon.beam(map);
 
     if tachyons.is_empty() {
@@ -89,8 +102,12 @@ fn traverse(tachyon: Tachyon, map: &Vec<Vec<char>>) -> i32 {
 
     let mut result = 0;
 
-    for tachyon in tachyons {
-        result += traverse(tachyon, map)
+    for tachyon in &tachyons {
+        result += traverse(&tachyon, map, cache);
+    }
+
+    if tachyons.len() == 2 {
+        cache.insert(tachyon.clone(), result);
     }
 
     result
