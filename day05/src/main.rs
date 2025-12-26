@@ -4,14 +4,14 @@ use std::error::Error;
 fn main() -> Result<(), Box<dyn Error>> {
     let mut stopwatch = StopWatch::new();
 
-    let (ranges, ids) = get_ids()?;
+    let (mut ranges, ids) = get_ids()?;
 
     stopwatch.start();
 
     let mut result = ids
-        .iter()
-        .filter(|id| ranges.iter().any(|x| x.is_in_range(*id)))
-        .count();
+        .into_iter()
+        .filter(|id| ranges.iter().any(|range| range.contains(id)))
+        .count() as u64;
 
     println!("PART 1: {result}");
 
@@ -19,16 +19,53 @@ fn main() -> Result<(), Box<dyn Error>> {
 
     stopwatch.start();
 
-    result = 0;
+    ranges.sort_by_key(|r| r.start);
 
-    // Get overlapping ranges and create new ranges that do not overlap
-    // then just calculate id count by end - start
+    let mut res: Vec<Range> = vec![];
+
+    for range in ranges.drain(..) {
+        if let Some(last) = res.last_mut()
+            && last.is_overlap(&range)
+        {
+            last.merge(&range);
+            continue;
+        }
+
+        res.push(range);
+    }
+
+    result = res.iter().fold(0, |acc, curr| acc + curr.count_ids());
 
     println!("PART 2: {result}");
 
     stopwatch.stop();
 
     Ok(())
+}
+
+#[derive(Eq, PartialEq, Hash)]
+struct Range {
+    start: u64,
+    end: u64,
+}
+
+impl Range {
+    fn contains(&self, id: &u64) -> bool {
+        id >= &self.start && id <= &self.end
+    }
+
+    fn is_overlap(&self, range: &Range) -> bool {
+        self.start <= range.end && range.start <= self.end
+    }
+
+    fn merge(&mut self, range: &Range) {
+        self.start = self.start.min(range.start);
+        self.end = self.end.max(range.end);
+    }
+
+    fn count_ids(&self) -> u64 {
+        self.end - self.start + 1
+    }
 }
 
 fn get_ids() -> Result<(Vec<Range>, Vec<u64>), Box<dyn Error>> {
@@ -62,15 +99,4 @@ fn get_ids() -> Result<(Vec<Range>, Vec<u64>), Box<dyn Error>> {
     })?;
 
     Ok((ranges, ids))
-}
-
-struct Range {
-    start: u64,
-    end: u64,
-}
-
-impl Range {
-    pub fn is_in_range(&self, id: &u64) -> bool {
-        id >= &self.start && id <= &self.end
-    }
 }
