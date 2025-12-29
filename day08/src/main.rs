@@ -8,17 +8,56 @@ fn main() -> Result<(), Box<dyn Error>> {
 
     stopwatch.start();
 
-    let distances = compute_distances(&junction_boxes)
-        .into_iter()
-        .take(1000)
-        .collect::<Vec<_>>();
+    let (mut circuits, _) = connect_circuits(
+        &junction_boxes,
+        &compute_distances(&junction_boxes)
+            .into_iter()
+            .take(1000)
+            .collect::<Vec<_>>(),
+    );
 
+    circuits.sort_by(|a, b| b.junction_boxes.len().cmp(&a.junction_boxes.len()));
+
+    let mut result = circuits
+        .iter()
+        .take(3)
+        .fold(1, |acc, curr| acc * curr.junction_boxes.len() as u64);
+
+    println!("PART 1: {result}");
+
+    stopwatch.stop();
+
+    stopwatch.start();
+
+    let (_, last) = connect_circuits(
+        &junction_boxes,
+        &compute_distances(&junction_boxes)
+            .into_iter()
+            .collect::<Vec<_>>(),
+    );
+
+    let (a, b) = last.unwrap();
+    result = a.x as u64 * b.x as u64;
+
+    println!("PART 2: {result}");
+
+    stopwatch.stop();
+
+    Ok(())
+}
+
+fn connect_circuits(
+    junction_boxes: &Vec<JunctionBox>,
+    distances: &Vec<(JunctionBox, JunctionBox)>,
+) -> (Vec<Circuit>, Option<(JunctionBox, JunctionBox)>) {
     let mut circuits = junction_boxes
         .iter()
         .map(|x| Circuit::new(x))
         .collect::<Vec<_>>();
 
-    for (a, b) in &distances {
+    let mut last = None;
+
+    for (a, b) in distances {
         let mut removed_circuits = Vec::new();
 
         circuits.retain(|x| {
@@ -35,27 +74,13 @@ fn main() -> Result<(), Box<dyn Error>> {
         merge_circuit.merge(removed_circuits.iter().nth(1));
 
         circuits.push(merge_circuit);
+
+        if circuits.len() == 1 && last.is_none() {
+            last = Some((a.to_owned(), b.to_owned()));
+        }
     }
 
-    circuits.sort_by(|a, b| b.junction_boxes.len().cmp(&a.junction_boxes.len()));
-
-    let result = circuits
-        .iter()
-        .take(3)
-        .fold(1, |acc, curr| acc * curr.junction_boxes.len());
-
-    println!("PART 1: {result}");
-
-    stopwatch.stop();
-
-    stopwatch.start();
-
-    // Should be easy enough, as long as the time complexity doesn't explode
-    // println!("PART 2: {input}");
-
-    stopwatch.stop();
-
-    Ok(())
+    (circuits, last)
 }
 
 #[derive(Clone, PartialEq, Eq, Hash, Debug)]
