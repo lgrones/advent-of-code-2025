@@ -17,7 +17,7 @@ fn main() -> Result<(), Box<dyn Error>> {
 
     stopwatch.start();
 
-    result = graph.get_paths_with_dac_and_fft();
+    result = graph.get_paths_through_dac_and_fft();
 
     println!("PART 2: {result}");
 
@@ -30,7 +30,6 @@ type DeviceId = usize;
 type DeviceName = String;
 
 struct Device {
-    name: DeviceName,
     outputs: Vec<DeviceId>,
 }
 
@@ -55,7 +54,6 @@ impl Graph {
         let id = self.devices.len();
 
         self.devices.push(Device {
-            name: name.to_string(),
             outputs: Vec::new(),
         });
         self.index.insert(name.to_string(), id);
@@ -70,21 +68,46 @@ impl Graph {
         self.devices[from_id].outputs.push(to_id);
     }
 
-    fn get_paths(&self) -> i32 {
+    fn get_paths(&self) -> u64 {
         traverse(
             &self,
             self.index["you"],
-            &mut vec![false; self.devices.len()],
-            false,
+            self.index["out"],
+            &mut vec![None; self.devices.len()],
         )
     }
 
-    fn get_paths_with_dac_and_fft(&self) -> i32 {
+    fn get_paths_through_dac_and_fft(&self) -> u64 {
         traverse(
             &self,
             self.index["svr"],
-            &mut vec![false; self.devices.len()],
-            true,
+            self.index["fft"],
+            &mut vec![None; self.devices.len()],
+        ) * traverse(
+            &self,
+            self.index["fft"],
+            self.index["dac"],
+            &mut vec![None; self.devices.len()],
+        ) * traverse(
+            &self,
+            self.index["dac"],
+            self.index["out"],
+            &mut vec![None; self.devices.len()],
+        ) + traverse(
+            &self,
+            self.index["svr"],
+            self.index["dac"],
+            &mut vec![None; self.devices.len()],
+        ) * traverse(
+            &self,
+            self.index["dac"],
+            self.index["fft"],
+            &mut vec![None; self.devices.len()],
+        ) * traverse(
+            &self,
+            self.index["fft"],
+            self.index["out"],
+            &mut vec![None; self.devices.len()],
         )
     }
 }
@@ -108,27 +131,24 @@ fn get_graph() -> Result<Graph, Box<dyn std::error::Error>> {
 
 fn traverse(
     graph: &Graph,
-    device_id: DeviceId,
-    visited: &mut Vec<bool>,
-    with_dac_and_fft: bool,
-) -> i32 {
-    if visited[device_id] {
-        return 0;
+    node: DeviceId,
+    target: DeviceId,
+    visited: &mut Vec<Option<u64>>,
+) -> u64 {
+    if node == target {
+        return 1;
     }
 
-    if graph.devices[device_id].name == "out" {
-        return (!with_dac_and_fft || (visited[graph.index["dac"]] && visited[graph.index["fft"]]))
-            as i32;
+    if let Some(total) = visited[node] {
+        return total;
     }
-
-    visited[device_id] = true;
 
     let mut result = 0;
-    for &next in &graph.devices[device_id].outputs {
-        result += traverse(graph, next, visited, with_dac_and_fft);
+    for &next in &graph.devices[node].outputs {
+        result += traverse(graph, next, target, visited);
     }
 
-    visited[device_id] = false;
+    visited[node] = Some(result);
 
     result
 }
