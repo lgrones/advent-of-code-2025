@@ -1,5 +1,6 @@
+use itertools::{self, Itertools};
 use lib::{StopWatch, read_file};
-use std::{collections::VecDeque, error::Error, fmt};
+use std::{collections::VecDeque, error::Error};
 
 fn main() -> Result<(), Box<dyn Error>> {
     let mut stopwatch = StopWatch::new();
@@ -10,10 +11,19 @@ fn main() -> Result<(), Box<dyn Error>> {
 
     let mut result = 0;
 
-    for machine in machines {
-        let mut min = i32::MAX;
-        traverse(&machine, 0, &mut min);
-        result += min;
+    for machine in &machines {
+        // every combination without replacment of k (0 to buttons.len()) buttons, smallest set first
+        for button_combination in machine.button_masks.iter().powerset() {
+            // check if the combination produces the light pattern by XORing 0 with each button
+            if button_combination
+                .iter()
+                .fold(0, |acc, button| acc ^ *button)
+                == machine.light_mask
+            {
+                result = result + button_combination.len();
+                break;
+            }
+        }
     }
 
     println!("PART 1: {result}");
@@ -21,6 +31,35 @@ fn main() -> Result<(), Box<dyn Error>> {
     stopwatch.stop();
 
     stopwatch.start();
+
+    result = 0;
+
+    for machine in &machines {
+        let mut k = 1;
+        let mut found = false;
+
+        while !found {
+            // every combination with replacement of k buttons, with k > 0
+            for button_combination in machine.buttons.iter().combinations_with_replacement(k) {
+                // check if the combination produces the joltage targets
+                let mut counters = machine.joltages.to_vec();
+
+                for button in button_combination {
+                    for counter_index in button {
+                        counters[*counter_index as usize] -= 1;
+                    }
+                }
+
+                if counters.iter().all(|x| *x == 0) {
+                    found = true;
+                    result += k;
+                    break;
+                }
+            }
+
+            k += 1;
+        }
+    }
 
     println!("PART 2: {result}");
 
@@ -31,59 +70,23 @@ fn main() -> Result<(), Box<dyn Error>> {
 
 #[derive(Clone)]
 struct Machine {
-    indicator_lights: i32,
-    buttons: Vec<i32>,
+    button_masks: Vec<i32>,
+    buttons: Vec<Vec<i32>>,
     joltages: Vec<i32>,
-    goal: i32,
+    light_mask: i32,
 }
 
 impl Machine {
-    fn new(indicator_lights: i32, buttons: Vec<i32>, joltages: Vec<i32>) -> Self {
+    fn new(indicator_lights: i32, buttons: Vec<Vec<i32>>, joltages: Vec<i32>) -> Self {
         Self {
-            indicator_lights: 0,
-            buttons,
+            buttons: buttons.to_vec(),
             joltages,
-            goal: indicator_lights,
+            button_masks: buttons
+                .iter()
+                .map(|button| button.iter().fold(0, |acc, x| acc | (1 << x)))
+                .collect(),
+            light_mask: indicator_lights,
         }
-    }
-
-    fn toggle(&self) -> Vec<Machine> {
-        self.buttons
-            .iter()
-            .map(|button| {
-                let mut clone = self.clone();
-                clone.indicator_lights ^= button;
-                clone
-            })
-            .collect()
-    }
-
-    fn goal_reached(&self) -> bool {
-        self.indicator_lights == self.goal
-    }
-}
-
-impl fmt::Debug for Machine {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        let s: String = format!("{:05b}", self.goal)
-            .chars()
-            .map(|c| if c == '0' { '.' } else { '#' })
-            .collect();
-
-        write!(f, "goal: {}", s)?;
-
-        let s: Vec<String> = self
-            .buttons
-            .iter()
-            .map(|button| {
-                format!("{:05b}", button)
-                    .chars()
-                    .map(|c| if c == '0' { '.' } else { '#' })
-                    .collect()
-            })
-            .collect();
-
-        write!(f, " buttons: {:?}", s)
     }
 }
 
@@ -109,31 +112,16 @@ fn get_machines() -> Result<Vec<Machine>, Box<dyn Error>> {
                 let mut buttons = vec![];
 
                 for button in components {
-                    let mask = button[1..button.len() - 1]
+                    let indices = button[1..button.len() - 1]
                         .split(",")
-                        .map(|x| x.parse::<i32>().unwrap())
-                        .fold(0, |acc, x| acc | (1 << x));
+                        .map(|x| x.parse().unwrap())
+                        .collect();
 
-                    buttons.push(mask);
+                    buttons.push(indices);
                 }
 
                 Machine::new(indicator_lights, buttons, joltages)
             })
             .collect()
     })
-}
-
-fn traverse(machine: &Machine, presses: i32, min: &mut i32) {
-    // TODO: find heuristic that works in all cases, > 5 just works for the example
-    if presses > 5 || &presses >= min {
-        return;
-    }
-
-    if machine.goal_reached() {
-        *min = presses;
-    }
-
-    for machine in machine.toggle() {
-        traverse(&machine, presses + 1, min);
-    }
 }
