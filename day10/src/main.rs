@@ -1,6 +1,9 @@
 use itertools::{self, Itertools};
 use lib::{StopWatch, read_file};
-use std::{collections::VecDeque, error::Error};
+use std::{
+    collections::{HashMap, VecDeque},
+    error::Error,
+};
 
 fn main() -> Result<(), Box<dyn Error>> {
     let mut stopwatch = StopWatch::new();
@@ -34,31 +37,28 @@ fn main() -> Result<(), Box<dyn Error>> {
 
     result = 0;
 
+    // Part 2 written by Claude (Opus 5.5)
     for machine in &machines {
-        let mut k = 1;
-        let mut found = false;
+        // every set of buttons pressed once each, as (effect on the counters, number of presses)
+        let subsets: Vec<(Vec<i32>, usize)> = machine
+            .buttons
+            .iter()
+            .powerset()
+            .map(|subset| {
+                let mut effect = vec![0; machine.joltages.len()];
 
-        while !found {
-            // every combination with replacement of k buttons, with k > 0
-            for button_combination in machine.buttons.iter().combinations_with_replacement(k) {
-                // check if the combination produces the joltage targets
-                let mut counters = machine.joltages.to_vec();
-
-                for button in button_combination {
-                    for counter_index in button {
-                        counters[*counter_index as usize] -= 1;
+                for button in &subset {
+                    for counter_index in *button {
+                        effect[*counter_index as usize] += 1;
                     }
                 }
 
-                if counters.iter().all(|x| *x == 0) {
-                    found = true;
-                    result += k;
-                    break;
-                }
-            }
+                (effect, subset.len())
+            })
+            .collect();
 
-            k += 1;
-        }
+        result += fewest_presses(&machine.joltages, &subsets, &mut HashMap::new())
+            .expect("machine should be solvable");
     }
 
     println!("PART 2: {result}");
@@ -66,6 +66,53 @@ fn main() -> Result<(), Box<dyn Error>> {
     stopwatch.stop();
 
     Ok(())
+}
+
+/// Written by Claude (Opus 5.5)
+///
+/// Any solution splits into an odd layer (each button pressed 0 or 1 times) plus twice a
+/// smaller solution, so target = subset + 2 * smaller, and smaller = (target - subset) / 2.
+/// That is the same puzzle at half the size, which gives the recurrence:
+///
+///   f(0) = 0
+///   f(target) = min over valid subsets of: presses + 2 * f((target - effect) / 2)
+///
+/// A subset is valid if every remaining counter is even and non-negative. Evenness is Part 1
+/// again, with lights = target mod 2. Returns None if the target can't be reached.
+fn fewest_presses(
+    target: &[i32],
+    subsets: &[(Vec<i32>, usize)],
+    memo: &mut HashMap<Vec<i32>, Option<usize>>,
+) -> Option<usize> {
+    if target.iter().all(|x| *x == 0) {
+        return Some(0);
+    }
+
+    if let Some(known) = memo.get(target) {
+        return *known;
+    }
+
+    let mut best = None;
+
+    // all matching subsets count, not just the smallest: fewest presses now isn't fewest overall
+    for (effect, presses) in subsets {
+        let remaining: Vec<i32> = target.iter().zip(effect).map(|(t, e)| t - e).collect();
+
+        if remaining.iter().any(|x| *x < 0 || x % 2 != 0) {
+            continue;
+        }
+
+        let halved: Vec<i32> = remaining.iter().map(|x| x / 2).collect();
+
+        if let Some(rest) = fewest_presses(&halved, subsets, memo) {
+            let total = presses + 2 * rest;
+            best = Some(best.map_or(total, |current: usize| current.min(total)));
+        }
+    }
+
+    memo.insert(target.to_vec(), best);
+
+    best
 }
 
 #[derive(Clone)]
